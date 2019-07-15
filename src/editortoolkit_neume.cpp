@@ -28,6 +28,7 @@
 #include "surface.h"
 #include "syl.h"
 #include "syllable.h"
+#include "system.h"
 #include "text.h"
 #include "vrv.h"
 
@@ -496,6 +497,14 @@ bool EditorToolkitNeume::Insert(std::string elementType, std::string staffId, in
         }
         else {
             parent = m_doc->GetDrawingPage()->FindChildByType(MEASURE);
+            if (parent == NULL) {
+                parent = new Measure(false);
+                System *system = dynamic_cast<System *>(m_doc->GetDrawingPage()->FindChildByType(SYSTEM));
+                assert(system);
+                system->AddChild(parent);
+                m_doc->PrepareDrawing();
+                system->SetDrawingScoreDef(&m_doc->m_scoreDef);
+            }
             assert(parent);
             newStaff = new Staff(1);
             newStaff->m_drawingStaffDef = dynamic_cast<StaffDef *>(m_doc->m_scoreDef.FindChildByType(STAFFDEF));
@@ -528,6 +537,7 @@ bool EditorToolkitNeume::Insert(std::string elementType, std::string staffId, in
                 parent->InsertChild(newStaff, i);
                 parent->Modify();
                 m_editInfo = newStaff->GetUuid();
+                m_doc->PrepareDrawing();
                 return true;
             }
         }
@@ -535,6 +545,7 @@ bool EditorToolkitNeume::Insert(std::string elementType, std::string staffId, in
         parent->AddChild(newStaff);
         parent->Modify();
         m_editInfo = newStaff->GetUuid();
+        m_doc->PrepareDrawing();
         return true;
     }
 
