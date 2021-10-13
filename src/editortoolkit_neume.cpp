@@ -2330,7 +2330,6 @@ bool EditorToolkitNeume::ChangeGroup(std::string elementId, std::string contour)
         }
         zone->SetUlx(newUlx);
         zone->SetUly(newUly);
-        ;
         zone->SetLrx(newLrx);
         zone->SetLry(newLry);
 
