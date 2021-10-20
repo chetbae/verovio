@@ -53,6 +53,7 @@ public:
     bool ChangeGroup(std::string elementId, std::string contour);
     bool ToggleLigature(std::vector<std::string> elementIds, std::string isLigature);
     bool ChangeStaff(std::string elementId);
+    bool ChangeCorresp(std::string elementId);
     ///@}
 protected:
     /**
@@ -77,6 +78,7 @@ protected:
     bool ParseChangeGroupAction(jsonxx::Object param, std::string *elementId, std::string *contour);
     bool ParseToggleLigatureAction(jsonxx::Object param, std::vector<std::string> *elementIds, std::string *isLigature);
     bool ParseChangeStaffAction(jsonxx::Object param, std::string *elementId);
+    bool ParseChangeCorrespAction(jsonxx::Object param, std::string *elementId);
     ///@}
 
     /**

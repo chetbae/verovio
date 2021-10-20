@@ -194,6 +194,13 @@ bool EditorToolkitNeume::ParseEditorAction(const std::string &json_editorAction)
         }
         LogWarning("Could not parse change staff action");
     }
+    else if (action == "changeCorresp") {
+        std::string elementId;
+        if (this->ParseChangeCorrespAction(json.get<jsonxx::Object>("param"), &elementId)) {
+            return this->ChangeCorresp(elementId);
+        }
+        LogWarning("Could not parse change corresp action");
+    }
     else {
         LogWarning("Unknown action type '%s'.", action.c_str());
     }
@@ -2462,15 +2469,7 @@ bool EditorToolkitNeume::ChangeStaff(std::string elementId)
         return false;
     }
 
-    // if (!(element->Is(SYLLABLE) || element->Is(CUSTOS) || element->Is(CLEF) || element->Is(ACCID))) {
-    //     LogError("Element is of type %s, but only Syllables, Custos, Clefs, and Accids can change staves.",
-    //         element->GetClassName().c_str());
-    //     m_infoObject.import("status", "FAILURE");
-    //     m_infoObject.import("message",
-    //         "Element is of type " + element->GetClassName()
-    //             + ", but only Syllables, Custos, Clefs, and Accids can change staves.");
-    //     return false;
-        if (!(element->Is(SYLLABLE) || element->Is(CUSTOS) || element->Is(CLEF))) {
+    if (!(element->Is(SYLLABLE) || element->Is(CUSTOS) || element->Is(CLEF) || element->Is(ACCID))) {
         LogError("Element is of type %s, but only Syllables, Custos, Clefs, and Accids can change staves.",
             element->GetClassName().c_str());
         m_infoObject.import("status", "FAILURE");
@@ -2478,6 +2477,14 @@ bool EditorToolkitNeume::ChangeStaff(std::string elementId)
             "Element is of type " + element->GetClassName()
                 + ", but only Syllables, Custos, Clefs, and Accids can change staves.");
         return false;
+        // if (!(element->Is(SYLLABLE) || element->Is(CUSTOS) || element->Is(CLEF))) {
+        // LogError("Element is of type %s, but only Syllables, Custos, Clefs, and Accids can change staves.",
+        //     element->GetClassName().c_str());
+        // m_infoObject.import("status", "FAILURE");
+        // m_infoObject.import("message",
+        //     "Element is of type " + element->GetClassName()
+        //         + ", but only Syllables, Custos, Clefs, and Accids can change staves.");
+        // return false;
     }
 
     ListOfObjects stavesList;
@@ -2633,6 +2640,92 @@ bool EditorToolkitNeume::ChangeStaff(std::string elementId)
     m_infoObject.import("elementId", elementId);
     m_infoObject.import("newStaffId", staff->GetUuid());
     return true;
+}
+
+bool EditorToolkitNeume::ChangeCorresp(std::string elementId)
+{
+    // Check if you can get drawing page
+    if (!m_doc->GetDrawingPage()) {
+        LogError("Could not get the drawing page");
+        m_infoObject.import("status", "FAILURE");
+        m_infoObject.import("message", "Could not get the drawing page.");
+        return false;
+    }
+
+    if (m_doc->GetType() != Facs) {
+        LogWarning("Change corresponding note is only available in facsimile mode.");
+        m_infoObject.import("status", "FAILURE");
+        m_infoObject.import("message", "Change corresponding note is only available in facsimile mode.");
+        return false;
+    }
+
+    Object *element = m_doc->GetDrawingPage()->FindDescendantByUuid(elementId);
+    assert(element);
+    if (element == NULL) {
+        LogError("No element exists with ID '%s'.", elementId.c_str());
+        m_infoObject.import("status", "FAILURE");
+        m_infoObject.import("message", "No element exists with ID" + elementId + ".");
+        return false;
+    }
+
+    // check if element is accid
+    if (!(element->Is(ACCID))) {
+        LogError("Element is of type %s, but only Accids can change corresp.",
+            element->GetClassName().c_str());
+        m_infoObject.import("status", "FAILURE");
+        m_infoObject.import("message",
+            "Element is of type " + element->GetClassName()
+                + ", but only Accids can change corresp.");
+        return false;
+    }
+
+    ListOfObjects ncList;
+    ClassIdComparison ac(NC);
+    m_doc->FindAllDescendantByComparison(&ncList, &ac);
+
+    std::vector<Object *> ncs(ncList.begin(), ncList.end());
+
+    ClosestBB comp;
+
+    if (dynamic_cast<FacsimileInterface *>(element)->HasFacs()) {
+        comp.x = element->GetFacsimileInterface()->GetZone()->GetUlx();
+        comp.y = element->GetFacsimileInterface()->GetZone()->GetUly();
+    }
+    else {
+        LogError("This element does not have a facsimile.");
+        m_infoObject.import("status", "FAILURE");
+        m_infoObject.import("message", "This element does not have a facsimile.");
+        return false;
+    }
+
+    Accid *accid = dynamic_cast<Accid *>(element);
+
+    Nc *nc = NULL;
+
+    if (ncs.size() > 0) {
+        std::sort(ncs.begin(), ncs.end(), comp);
+        nc = dynamic_cast<Nc *>(ncs.front());
+    }
+    else {
+        LogError("Could not find any neume components. This should not happen");
+        m_infoObject.import("status", "FAILURE");
+        m_infoObject.import("message", "Could not find any neume components. This should not happen");
+        return false;
+    }
+
+    for (auto it = nc->GetFirst(); it != nc->GetLast(); ++it) {
+        PitchInterface *pi = it->GetPitchInterface();
+        if (pi->GetPname() == PITCHNAME_b) {
+            accid->SetCorresp(it->GetId());
+        }
+    }
+
+    m_infoObject.import("status", "OK");
+    m_infoObject.import("message", "");
+    m_infoObject.import("corresp", elementId);
+    m_infoObject.import("newCorrespId", accid->GetCorresp());
+    return true;
+
 }
 
 bool EditorToolkitNeume::ParseDragAction(jsonxx::Object param, std::string *elementId, int *x, int *y)
@@ -2865,6 +2958,14 @@ bool EditorToolkitNeume::ParseToggleLigatureAction(
 }
 
 bool EditorToolkitNeume::ParseChangeStaffAction(jsonxx::Object param, std::string *elementId)
+{
+    if (!param.has<jsonxx::String>("elementId")) return false;
+    (*elementId) = param.get<jsonxx::String>("elementId");
+
+    return true;
+}
+
+bool EditorToolkitNeume::ParseChangeCorrespAction(jsonxx::Object param, std::string *elementId)
 {
     if (!param.has<jsonxx::String>("elementId")) return false;
     (*elementId) = param.get<jsonxx::String>("elementId");
